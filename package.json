@@ -1,0 +1,26 @@
+{
+  "author": "Benson Wong",
+  "name": "cloudtrail-es-importer",
+  "description": "Downloads Cloudtrail logs and puts them into ElasticSearch",
+  "version": "0.0.1",
+  "repository": {
+    "url": ""
+  },
+  "main": "cloudtrail-elasticsearch",
+  "engines": {
+    "node": "~0.10.0"
+  },
+  "dependencies": {
+      "commander": "2.0.x"
+      , "debug" : "0.7.2"
+      , "aws-sdk" : "1.6.0"
+      , "moment": "2.2.1"
+      , "async" : "0.2.9"
+      , "underscore" : "1.5.2"
+      , "sprintf" : "0.1.2"
+      , "temp" : "0.6.0"
+  },
+  "devDependencies": {
+  },
+  "scripts": { }
+}
