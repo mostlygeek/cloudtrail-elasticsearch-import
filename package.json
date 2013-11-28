@@ -18,6 +18,7 @@
       , "async" : "0.2.9"
       , "underscore" : "1.5.2"
       , "sprintf" : "0.1.2"
+      , "elastical" : "0.0.12"
       , "temp" : "0.6.0"
   },
   "devDependencies": {
