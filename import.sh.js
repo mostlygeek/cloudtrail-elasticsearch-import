@@ -13,7 +13,6 @@
 
 const 
     ES_FILE_CONCURRENCY=1    /* how many concurrent S3 cloudtrail files to do */
-    , ES_EVENT_CONCURRENCY=5   /* how many concurrent event index requests to make */
     ; 
 
 var AWS = require('aws-sdk')
@@ -220,10 +219,9 @@ function processItemWorker(task, processItemWorkerCB) {
     ES.get(task.workIndexName, ETag, function(err, doc, res) {
         if (res && res.error) {
             d.ESError(res.error);
-            workerCB();
+            processItemWorkerCB();
             return;
         }
-
 
         if (res && res.exists == true) {
             d.info("skip %s, already exists", ETag);
@@ -246,28 +244,43 @@ function processItemWorker(task, processItemWorkerCB) {
         stream.on('end', function() {
             var o = JSON.parse(jsonSrc); 
 
-            var indexQueue = async.queue(function(eventTask, workerCB) {
-                ES.index(task.cloudtrailIndexName, "event", eventTask, function(err, res) {
-                    d.info("Indexed: %s on %s by %s", eventTask.eventName, eventTask.eventSource, eventTask.userIdentity.arn);
-                    workerCB();
-                });
-            }, ES_EVENT_CONCURRENCY);
-
-            d.info("Indexing %d items", o.Records.length);
-            indexQueue.push(o.Records);
-            indexQueue.drain = function() {
-                var doc = {
-                    _id : ETag
-                    , key : task.Key
-                    , timestamp: moment().format()
-                };
-
-                // mark that we've already processed this
-                d.info("Marking (%s) %s done", ETag, task.Key);
-                ES.index(task.workIndexName, "s3obj", doc, {id: ETag}, function(err, res) {
-                    processItemWorkerCB();
+            // ref: https://github.com/ramv/node-elastical/blob/master/lib/client.js#L129
+            var _bulk = [];
+            for (var i=0,l=o.Records.length; i<l; i++) {
+                _bulk.push({
+                    index: {
+                        index: task.cloudtrailIndexName
+                        , type: "event"
+                        , data: o.Records[i]
+                    }
                 });
             }
+
+            var doc = {
+                _id : ETag
+                , key : task.Key
+                , timestamp: moment().format()
+            };
+
+            // will mark the s3 object as done
+            _bulk.push({
+                index: {
+                    index: task.workIndexName
+                    , type: "s3obj"
+                    , data: doc
+                    , id: ETag
+                }
+            });
+
+            ES.bulk(_bulk, function(err, res) {
+                if (err) {
+                    d.info("Error bulk index: %s", err);
+                } else {
+                    d.info("Bulk indexed %d items", _bulk.length);
+                }
+
+                processItemWorkerCB();
+            });
         });
     });
     
